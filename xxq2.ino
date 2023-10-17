@@ -1,0 +1,173 @@
+#include <TimerOne.h>
+//申明库文件
+// 引脚定义
+#define S0 10 // 物体表面的反射光越强，TCS3002D内置振荡器产生的方波频率越高，
+#define S1 11 // S0和S1的组合决定输出信号频率比例因子，比例因子为2%
+ // 比率因子为TCS3200传感器OUT引脚输出信号频率与其内置振荡器频率之比
+#define S2 8 // S2和S3的组合决定让红、绿、蓝，哪种光线通过滤波器
+#define S3 9
+#define OUT 2 // TCS3200颜色传感器输出信号连接到Arduino中断0引脚，并引发脉冲信号中断
+ // 在中断函数中记录TCS3200输出信号的脉冲个数
+//定义五中运动状态 
+#define STOP      0
+#define FORWARD   1
+#define BACKWARD  2
+#define TURNLEFT  3
+#define TURNRIGHT 4
+//定义需要用到的引脚
+int leftMotor1 = 4;
+int leftMotor2 = 5;
+int rightMotor1 = 6;
+int rightMotor2 = 7;
+int trigPinFront = 30;
+int echoPinFront = 31;
+int trigPinLeft = 32;
+int echoPinLeft = 33;
+int trigPinRight = 34;
+int echoPinRight = 35;
+//red值初始化
+int red = 0; 
+int stop_cnt=0;
+
+void TSC_Init()
+{
+ // 初始化TSC3200各控制引脚的输入输出模式
+ pinMode(S0, OUTPUT);
+ pinMode(S1, OUTPUT);
+ pinMode(S2, OUTPUT);
+ pinMode(S3, OUTPUT);
+ pinMode(OUT, INPUT);
+ // 设置TCS3002D的内置振荡器方波频率与其输出信号频率的比例因子为2%
+ digitalWrite(S0, LOW); 
+ digitalWrite(S1, HIGH);
+ digitalWrite(S2, LOW);
+ digitalWrite(S3, LOW);
+}
+ 
+
+
+void setup() {
+  TSC_Init();
+  Serial.begin(9600);
+  // put your setup code here, to run once:
+  //设置控制电机的引脚为输出状态
+  pinMode(leftMotor1, OUTPUT);
+  pinMode(leftMotor2, OUTPUT);
+  pinMode(rightMotor1, OUTPUT);
+  pinMode(rightMotor2, OUTPUT);
+  //设置超声波模块的引脚为输入输出状态
+  pinMode(trigPinFront, OUTPUT);
+  pinMode(echoPinFront, INPUT);
+  pinMode(trigPinLeft, OUTPUT);
+  pinMode(echoPinLeft, INPUT);
+  pinMode(trigPinRight, OUTPUT);
+  pinMode(echoPinRight, INPUT);
+
+}
+//
+
+
+
+void loop() {
+    int out=pulseIn(OUT, digitalRead(OUT) == HIGH ? LOW : HIGH);
+    Serial.println(out,DEC);
+   if ( out < 900&&stop_cnt==0)
+  {
+    motorRun(STOP);
+    delay(7000);
+    stop_cnt++;
+    motorRun(BACKWARD);
+    delay(50);
+    motorRun(TURNRIGHT);
+    delay(500);
+  }
+  
+   //put your main code here, to run repeatedly:
+  int distanceFront = getDistance(trigPinFront, echoPinFront);
+  
+  if(distanceFront >= 10) {   
+    int distanceLeft = getDistance(trigPinLeft, echoPinLeft);
+  int distanceRight = getDistance(trigPinRight, echoPinRight);
+    if(distanceLeft<distanceRight){
+      motorRun(TURNRIGHT);
+      delay(5);
+      motorRun(TURNLEFT);
+      delay(5);
+       motorRun(FORWARD);
+      delay(50);
+    }
+    else  {
+      motorRun(TURNLEFT);
+      delay(5);
+      motorRun(TURNRIGHT);
+      delay(5);
+       motorRun(FORWARD);
+       delay(50);
+    }
+   
+    //motorRun(TURNRIGHT);
+} else {
+    int distanceLeft = getDistance(trigPinLeft, echoPinLeft);
+    int distanceRight = getDistance(trigPinRight, echoPinRight);
+    motorRun(BACKWARD);
+    delay(50);
+    if(distanceLeft < distanceRight) {
+      motorRun(TURNRIGHT);
+      delay(380);
+    } else {
+      motorRun(TURNLEFT);
+      delay(380);
+    }
+   // delay(200);
+  // delay(10);
+ }
+}
+
+
+//运动控制函数
+void motorRun(int cmd)
+{
+  switch(cmd){
+    case FORWARD:
+      analogWrite(leftMotor1, 0);
+      analogWrite(leftMotor2, 80);
+      analogWrite(rightMotor1, 0);
+      analogWrite(rightMotor2, 80);
+      break;
+     case BACKWARD:
+      analogWrite(leftMotor1, 100);
+      analogWrite(leftMotor2, 0);
+      analogWrite(rightMotor1, 100);
+      analogWrite(rightMotor2, 0);
+      break;
+     case TURNLEFT:
+      analogWrite(leftMotor1, 130);
+      analogWrite(leftMotor2, 0);
+      analogWrite(rightMotor1, 0);
+      analogWrite(rightMotor2, 130);
+      break;
+     case TURNRIGHT:
+      analogWrite(leftMotor1, 0);
+      analogWrite(leftMotor2, 130);
+      analogWrite(rightMotor1, 130);
+      analogWrite(rightMotor2, 0);
+      break;
+     default:
+      digitalWrite(leftMotor1, LOW);
+      digitalWrite(leftMotor2, LOW);
+      digitalWrite(rightMotor1, LOW);
+      digitalWrite(rightMotor2, LOW);
+  }
+}
+
+//获取超声波模块测量的距离
+int getDistance(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  long duration = pulseIn(echoPin, HIGH);
+  int distance = duration * 0.034 / 2;
+  return distance;
+} 
